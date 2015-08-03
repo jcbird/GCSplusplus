@@ -1,6 +1,7 @@
 from __future__ import print_function
 import numpy as np
 import pm_to_velocities as pm_to_vels
+import emcee
 
 class HyperParams():
     """
@@ -19,6 +20,15 @@ class HyperParams():
 
     def get_sigma2Ws(self):
         return self.sigma2Ws
+
+def run_emcee(ndim, nwalkers, lnprob_func, lnprob_args):
+    if (len(lnprob_args)==2):
+        ivar = 1. / np.random.rand(ndim)
+        p0 = [np.random.rand(ndim) for i in range(nwalkers)]
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob_func,
+                args=lnprob_args)
+        sampler.run_mcmc(p0,500)
+        return sampler
 
 def lnlh(data, params, hyperparams):
     """
@@ -60,7 +70,7 @@ def lnprior(params, hyperparams):
         return -np.Inf
     return 0.
 
-def lnprob(data, params, hyperparams):
+def lnprob(params, data, hyperparams):
     lnp = lnprior(params, hyperparams)
     if not np.isfinite(lnp):
         return -np.Inf
@@ -74,6 +84,8 @@ if __name__ == "__main__":
     params = (10.,0.4,0.05) #km/s,beta,kpc**-1 
     #(variance_W0, beta_W, inv_scalelen_W) = params
     hyperparams = HyperParams(data.get_sigma2Ws())
-    result = lnprob(data,params,hyperparams)
-    print ('lnprob: {}'.format(result))
+    emcee_sampler = run_emcee(ndim=3, nwalkers=10, lnprob_func=lnprob,
+            lnprob_args=[data,hyperparams])
+    #result = lnprob(data,params,hyperparams)
+    #print ('lnprob: {}'.format(result))
     #pass

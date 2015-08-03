@@ -110,7 +110,10 @@ class PMmeasurements:
         self.vRvTvZ_g = bcoords.vxvyvz_to_galcencyl(self.spacevels[:,0], self.spacevels[:,1], self.spacevels[:,2], self.data['RC_GALR'], self.data['RC_GALPHI'], self.data['RC_GALZ'], vsun=[-11.1,30.24*8.,7.2], galcen=True)
 
     def get_ages(self):
-        return self.catalog['cannon_AGE'][self.mask]
+        """
+        HACK!!!! Taking absolute ages until ln(age) available
+        """
+        return np.abs(self.catalog['cannon_AGE'][self.mask])
 
     def get_Ws(self):
         return self.data['GALVZ'] #km/s from Jo
