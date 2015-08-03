@@ -32,19 +32,27 @@ data_dict = {'vW':vW, 'vW_err':vW_err, 'age':age, 'bovy_vz':bovy_vZ, 'galr':galr
 dataframe = pd.DataFrame(data_dict)
 
 ### Try just doing GCS first
-velerr_cut = vW_err<75.
+velerr_cut = vW_err<1500.
 labels = ['{}'.format(cenloc) for cenloc in cen_radii]
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
-for i in range(len(cen_radii)):
+for i in [0]:#range(len(cen_radii)):
     df = dataframe[central_masks[i] & velerr_cut]
     equallogbins = 10**np.arange(0,1.14,0.125)  #half the estimated error
     equallogbins2 = 10**np.arange(0.0625,1.24,0.125)  #half the estimated error
     dfbyage = df.groupby(pd.cut(df.age,equallogbins, labels=False))
     dfbyage2 = df.groupby(pd.cut(df.age,equallogbins2, labels=False))
+    ncounts1 = dfbyage.age.count()
+    ncounts2 = dfbyage2.age.count()
+    SEvar1 = dfbyage.vW.var() * np.sqrt(2./(ncounts1-1))
+    SEvar2 = dfbyage2.vW.var() * np.sqrt(2./(ncounts2-1))
+    meanerr_sq = dfbyage.vW_err.mean()
+    meanerr_sq2 = dfbyage2.vW_err.mean()
     sortage = np.argsort(np.hstack((dfbyage.age.mean(),dfbyage2.age.mean())))
-    ax.plot(np.hstack((dfbyage.age.mean(),dfbyage2.age.mean()))[sortage], np.hstack((dfbyage.vW.std(),dfbyage2.vW.std()))[sortage], label=labels[i])
+    ax.errorbar(np.hstack((dfbyage.age.mean(),dfbyage2.age.mean()))[sortage], np.hstack((dfbyage.vW.var(),dfbyage2.vW.var()))[sortage], yerr= np.hstack((SEvar1, SEvar2))[sortage], label=labels[i])
+    ax.errorbar(np.hstack((dfbyage.age.mean(),dfbyage2.age.mean()))[sortage], np.hstack((dfbyage.vW.var(),dfbyage2.vW.var()))[sortage] - np.hstack((meanerr_sq, meanerr_sq2))[sortage], yerr= np.hstack((SEvar1, SEvar2))[sortage], label=labels[i], c='gray')
+    #ax.plot(np.hstack((dfbyage.age.mean(),dfbyage2.age.mean()))[sortage], np.hstack((dfbyage.vW.std(),dfbyage2.vW.std()))[sortage], label=labels[i])
     #plt.scatter(dfbyage.age.mean(), dfbyage.vW.std(), label=labels[i])
     #plt.scatter(dfbyage2.age.mean(), dfbyage2.vW.std(), label=labels[i])
 plt.legend(loc='upper left')
