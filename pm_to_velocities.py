@@ -2,8 +2,10 @@ import numpy as np
 import galpy
 from galpy.util import bovy_coords as bcoords
 import utils
+from collections import namedtuple
 
 catalog = utils.returncat()
+
 
 class PMmeasurements:
     """
@@ -26,6 +28,7 @@ class PMmeasurements:
         self._colname_mod = '_PPMXL' if pmcatalog=='PPMXL' else ''
         self.degree = True #RA,DEC in degrees
         self._generatemask()
+        self.Data = namedtuple('Data', ['ages', 'radii', 'Ws', 'sigma2Ws'])
         self.grabdata()
 
     def _generatemask(self):
@@ -123,6 +126,25 @@ class PMmeasurements:
 
     def get_sigma2Ws(self):
         return self.spacevel_uncer_var_tensor[:,2,2] #(km.s)**2
+
+    def get_tau_radii_vZg_sigma2Ws_container(self,
+            max_uncer_variance=10000.):
+        """
+        WEIRD NAME: reminds me that need to propagate sigma2Ws to sigma2vZg
+        Propagates velocity uncertainty cut to data
+        returns shape(4,N)
+        (ages, radii, Ws, sigma2Ws)
+        """
+        self.sigma2W_uncer_cut = max_uncer_variance
+        sigma2Ws_mask = self.get_sigma2Ws() < max_uncer_variance
+        age_cut = np.logical_and(self.get_ages()>0.1,self.get_ages()<12)
+        combined_mask = sigma2Ws_mask & age_cut
+        print(np.sum(combined_mask))
+        data_container = self.Data(ages=self.get_ages()[combined_mask],
+                radii=self.get_radii()[combined_mask],
+                Ws=self.get_Ws()[combined_mask],
+                sigma2Ws=self.get_sigma2Ws()[combined_mask])
+        return data_container
 
 ###Abandoned, left for dead until further notice    
 #print (self.data['GLON'][:10], "8")
