@@ -11,22 +11,29 @@ class PMmeasurements:
     """
     Class to contain PMs and errors. This will make it each to switch between UCAC and PMXXL later.
 
+    # Inputs
+    - biascorect  (string) 'dqsou', 'dgalu', 'ppmxl'
+                  'dqsou' and 'dgalu' refer to interpolated corrections from Bertrand (see HWR email
+                  from 2015-08-04) using either quasars or galaxies as a reference objects.
+                  'ppmxl' uses mean velocity of entire ppmxl catalog as a function of position
+                  PPMXL NOT IMPLIMENTED
     # Bugs
-
     - galpy:   rewrites the input l,b; need to fork and fix
         + Hack: change degree keyword to False for conversions (NASTY)
 
     # Decisions, todos
 
+    - REWRITE data section to use getters
     - MAJOR Propagate uncertainty tensor from UVW to galactocentric frame
     - 2015-08-03 Assuming 5% distance errors to calc spacevels.
     - 2015-08-03 Fork Galpy and rewrite conv to galcencycl coords.
     """
-    def __init__(self,pmcatalog='PPMXL', RCcatalog=catalog):
+    def __init__(self,pmcatalog='PPMXL', RCcatalog=catalog, biascorrect=None):
         self.pmcatalog = pmcatalog
         self.catalog = catalog
         self._colname_mod = '_PPMXL' if pmcatalog=='PPMXL' else ''
         self.degree = True #RA,DEC in degrees
+        self.biascorrect = biascorrect
         self._generatemask()
         self.Data = namedtuple('Data', ['ages', 'radii', 'Ws', 'sigma2Ws'])
         self.grabdata()
@@ -60,6 +67,34 @@ class PMmeasurements:
         self.data['RC_GALZ'] = self.catalog['RC_GALZ'][self.mask]
         self.data['RC_GALPHI'] = self.catalog['RC_GALPHI'][self.mask]
 
+    def get_pm_corr(self):
+        """
+        Getter for proper motion corrections (subtracting off mean PM of PPMXL)
+        # Inputs
+        - source: (string) 'dqsou', 'dgalu', 'ppmxl'
+                  'dqsou' and 'dgalu' refer to interpolated corrections from Bertrand (see HWR email
+                  from 2015-08-04) using either quasars or galaxies as a reference objects.
+                  'ppmxl' uses mean velocity of entire ppmxl catalog as a function of position
+
+        # Outputs
+        - dpmra: (array)  delta offset in RA [mas/yr]
+        - dpmdec: (array) delta offset in DEC [mas/yr]
+        self.mask is applied to each array
+
+        # TODO
+        'ppmxl' NOT IMPLIMENTED YET
+        """
+        if self.biascorrect is not 'ppmxl':
+            dpmra = self.get_col(self.biascorrect+'RA')
+            dpmdec = self.get_col(self.biascorrect+'DEC')
+            dpmra[np.isnan(dpmra)] = 0.0  # mas/yr , if NO correction available, set to 0.0
+            dpmdec[np.isnan(dpmdec)] = 0.0  # mas/yr , if NO correction available, set to 0.0
+            print('Bias-correction for PMs\nSource: {0}'.format(self.biascorrect))
+            return(dpmra,dpmdec)
+        else:
+            print('ppmxl mean PM correction not available yet')
+
+
     def calc_covar_pmrapmdec(self):
         pmrapmdec_corrcoefs = np.corrcoef(self.data['pmra_uncer'], self.data['pmdec_uncer'])
         pmra_uncer = self.data['pmra_uncer']
@@ -69,7 +104,13 @@ class PMmeasurements:
 
     def conv_pmrapmdec_to_pmllpmbb(self):
         ###step 1: convert PM radec to PM l,b
-        self.pmll_pmbb = bcoords.pmrapmdec_to_pmllpmbb(self.data['pmra'], self.data['pmdec'], self.data['RA'],self.data['DEC'], degree=self.degree, epoch=2000.0)
+        if self.biascorrect is not None:
+            (dpmra,dpmdec) = self.get_pm_corr()#self.biascorrect)
+            pmra = self.get_col('PMRA') + dpmra
+            pmdec = self.get_col('PMDEC') + dpmdec
+            self.pmll_pmbb = bcoords.pmrapmdec_to_pmllpmbb(pmra, pmdec, self.get_col('RA'),self.get_col('DEC'), degree=self.degree, epoch=2000.0)
+        else:
+            self.pmll_pmbb = bcoords.pmrapmdec_to_pmllpmbb(self.data['pmra'], self.data['pmdec'], self.data['RA'],self.data['DEC'], degree=self.degree, epoch=2000.0)
 
     def calc_covar_pmllpmbb(self):
         self.covar_pmllpmbb = bcoords.cov_pmrapmdec_to_pmllpmbb(self.covar_pmradec,self.data['RA'], self.data['DEC'], degree=self.degree,epoch=2000.0)
@@ -105,12 +146,30 @@ class PMmeasurements:
         Uses R, phi, z in kpc from RC catalog
         This matches JoBo's RC catalog assumptions
 
+        # BUGS
+
+        - galpy maipulates input GLON, GLAT
+        - HACK: puts in back in degrees
+        - EVENTUAL FIX: PR galpy with not mutating attribute
         # Output
 
         vRg, vTg, vZg  # km/s
 
         """
         self.vRvTvZ_g = bcoords.vxvyvz_to_galcencyl(self.spacevels[:,0], self.spacevels[:,1], self.spacevels[:,2], self.data['RC_GALR'], self.data['RC_GALPHI'], self.data['RC_GALZ'], vsun=[-11.1,30.24*8.,7.2], galcen=True)
+        ###BEWARE, HACK TIME
+        self.data['GLON'] = np.degrees(self.data['GLON'])
+        self.data['GLAT'] = np.degrees(self.data['GLAT'])
+
+    def get_col(self, colname):
+        """
+        Important function to grab column from catalog while applying
+        the PMMATCH mask.
+
+        #TODO
+        - propagate use of this function everywhere internally
+        """
+        return self.catalog[colname][self.mask]
 
     def get_ages(self):
         """

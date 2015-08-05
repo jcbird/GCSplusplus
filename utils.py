@@ -43,7 +43,19 @@ def returncat():
     newnames = ["cannon_"+i for i in ness_fields]
     ness_cat.dtype.names=newnames
 
-    RC_cannon_cat = rfn.merge_arrays([RCcat, ness_cat], asrecarray=True, flatten=True)
+    ### Just add in delta corrections from PPMXL
+    pm_corr_file = os.path.join(apogee_data_dir, 'qso_gal_pm_corrections')
+    corr_fields = ['corr_RA', 'corr_DEC', 'dgaluRA', 'dgaluDEC', 'dqsouRA', 'dqsouDEC']
+    corr_dtypes=ness_dtypes[1:7]
+    ndtypes_corr = [(i,j) for i,j in zip(corr_fields, corr_dtypes)]
+    pmcorr_cat = np.genfromtxt(pm_corr_file, dtype=ndtypes_corr)
+    pmcorr_cat.sort(order= 'corr_RA')
+    #### Need to sort all against RA, then join
+
+    print ('Sum difference of RA in correction file and RC cat: {0}'.format(np.sum(pmcorr_cat['corr_RA'] - RCcat['RA'])))
+    print ('Sum difference of DEC in correction file and RC cat: {0}'.format(np.sum(pmcorr_cat['corr_DEC'] - RCcat['DEC'])))
+
+    RC_cannon_cat = rfn.merge_arrays([RCcat, ness_cat, pmcorr_cat], asrecarray=True, flatten=True)
     return RC_cannon_cat
 
 
