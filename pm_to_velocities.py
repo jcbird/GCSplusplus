@@ -113,8 +113,8 @@ class PMmeasurements:
         ###step 1: convert PM radec to PM l,b
         if self.biascorrect is not None:
             (dpmra,dpmdec) = self.get_pm_corr()#self.biascorrect)
-            pmra = self.get_col('PMRA') + dpmra
-            pmdec = self.get_col('PMDEC') + dpmdec
+            pmra = self.get_col(self._colname('PMRA')) + dpmra
+            pmdec = self.get_col(self._colname('PMDEC')) + dpmdec
             self.pmll_pmbb = bcoords.pmrapmdec_to_pmllpmbb(pmra, pmdec, self.get_col('RA'),self.get_col('DEC'), degree=self.degree, epoch=2000.0)
         else:
             self.pmll_pmbb = bcoords.pmrapmdec_to_pmllpmbb(self.data['pmra'], self.data['pmdec'], self.data['RA'],self.data['DEC'], degree=self.degree, epoch=2000.0)
