@@ -38,14 +38,21 @@ class PMmeasurements:
         self.Data = namedtuple('Data', ['ages', 'radii', 'Ws', 'sigma2Ws'])
         self.grabdata()
 
-    def _generatemask(self):
-        """
-        Uses 'match' arrays to build boolean mask that finds all stars with PM matches corresponding to the catalog used. Mask applied to catalog before conversion
-        """
-        self.mask = (self.catalog['PMMATCH{}'.format(self._colname_mod)]==1)
-
     def _colname(self,basename):
         return '{0}{1}'.format(basename,self._colname_mod)
+
+    def _generatemask(self):
+        """
+        Uses 'match' arrays to build boolean mask that finds all stars with PM matches 
+        corresponding to the catalog used. Mask applied to catalog before conversion
+
+        Also makes sure those PMs are reasonable with > -100 mas/yr cutoff
+        """
+        matches = (self.catalog['PMMATCH{}'.format(self._colname_mod)]==1)
+        goodpmRA = (self.catalog[self._colname('PMRA')] > -100.)  # mas/yr
+        goodpmDEC = (self.catalog[self._colname('PMDEC')] > -100.)  # mas/yr
+        self.mask = np.logical_and.reduce((matches, goodpmRA, goodpmDEC))
+
 
     def grabdata(self, degree=True):
         """

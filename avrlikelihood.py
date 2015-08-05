@@ -81,7 +81,7 @@ def lnprior(params, hyperparams):
         return -np.Inf
     if variance_W0 > 10000.:  # (km/s)**2
         return -np.Inf
-    if beta_W < 0.15:   # need to justify prior (repeat everywhere)
+    if beta_W < 0.05:   # need to justify prior (repeat everywhere)
         return -np.Inf
     if beta_W > 1.:
         return -np.Inf
@@ -105,10 +105,11 @@ def mk_triangle_plot(sampler, nstart=500):
 
 
 if __name__ == "__main__":
-    pmdata = pm_to_vels.PMmeasurements(RCcatalog = pm_to_vels.catalog)
+    pmdata = pm_to_vels.PMmeasurements(RCcatalog = pm_to_vels.catalog, biascorrect='dqsou')
     pmdata.to_space_velocties()
     pmdata.UVW_to_galcen()
     data = pmdata.get_tau_radii_vZg_sigma2Ws_container(max_uncer_variance=200.)
+    #data = pmdata.get_tau_radii_vZg_sigma2Ws_container()#max_uncer_variance=200.)
     hyperparams = HyperParams(data.sigma2Ws)
     ndim = 3
     nwalkers = 20
