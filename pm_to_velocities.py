@@ -31,15 +31,18 @@ class PMmeasurements:
     def __init__(self,pmcatalog='PPMXL', RCcatalog=catalog, biascorrect=None):
         self.pmcatalog = pmcatalog
         self.catalog = catalog
-        self._colname_mod = '_PPMXL' if pmcatalog=='PPMXL' else ''
+        self._pmcolname_mod = '_PPMXL' if pmcatalog=='PPMXL' else ''
         self.degree = True #RA,DEC in degrees
         self.biascorrect = biascorrect
         self._generatemask()
         self.Data = namedtuple('Data', ['ages', 'radii', 'Ws', 'sigma2Ws'])
         self.grabdata()
 
-    def _colname(self,basename):
-        return '{0}{1}'.format(basename,self._colname_mod)
+    def _pmcolname(self,basename):
+        """
+        Puts PM catalog ID in string for getters
+        """
+        return '{0}{1}'.format(basename,self._pmcolname_mod)
 
     def _generatemask(self):
         """
@@ -48,9 +51,9 @@ class PMmeasurements:
 
         Also makes sure those PMs are reasonable with > -100 mas/yr cutoff
         """
-        matches = (self.catalog['PMMATCH{}'.format(self._colname_mod)]==1)
-        goodpmRA = (self.catalog[self._colname('PMRA')] > -100.)  # mas/yr
-        goodpmDEC = (self.catalog[self._colname('PMDEC')] > -100.)  # mas/yr
+        matches = (self.catalog['PMMATCH{}'.format(self._pmcolname_mod)]==1)
+        goodpmRA = (self.catalog[self._pmcolname('PMRA')] > -100.)  # mas/yr
+        goodpmDEC = (self.catalog[self._pmcolname('PMDEC')] > -100.)  # mas/yr
         self.mask = np.logical_and.reduce((matches, goodpmRA, goodpmDEC))
 
 
@@ -59,11 +62,11 @@ class PMmeasurements:
         assign reasonable variable names to PM columns of RC catalog depending upon which survey is being used. Then pass to Galpy.
         """
         self.data = {}
-        self.data['GALVZ'] = self.catalog[self._colname('GALVZ')][self.mask]
-        self.data['pmra'] = self.catalog[self._colname('PMRA')][self.mask]
-        self.data['pmra_uncer'] = self.catalog[self._colname('PMRA_ERR')][self.mask]
-        self.data['pmdec'] = self.catalog[self._colname('PMDEC')][self.mask]
-        self.data['pmdec_uncer'] = self.catalog[self._colname('PMDEC_ERR')][self.mask]
+        self.data['GALVZ'] = self.catalog[self._pmcolname('GALVZ')][self.mask]
+        self.data['pmra'] = self.catalog[self._pmcolname('PMRA')][self.mask]
+        self.data['pmra_uncer'] = self.catalog[self._pmcolname('PMRA_ERR')][self.mask]
+        self.data['pmdec'] = self.catalog[self._pmcolname('PMDEC')][self.mask]
+        self.data['pmdec_uncer'] = self.catalog[self._pmcolname('PMDEC_ERR')][self.mask]
         self.data['distance'] = self.catalog['RC_DIST'][self.mask]
         self.data['vlos'] = self.catalog['VHELIO_AVG'][self.mask]
         self.data['RA'] = self.catalog['RA'][self.mask]
@@ -111,13 +114,15 @@ class PMmeasurements:
 
     def conv_pmrapmdec_to_pmllpmbb(self):
         ###step 1: convert PM radec to PM l,b
+        pmra = self.get_col('PMRA')
+        pmdec = self.get_col('PMDEC')
         if self.biascorrect is not None:
             (dpmra,dpmdec) = self.get_pm_corr()#self.biascorrect)
-            pmra = self.get_col(self._colname('PMRA')) + dpmra
-            pmdec = self.get_col(self._colname('PMDEC')) + dpmdec
+            pmra+= dpmra
+            pmdec+= dpmdec
             self.pmll_pmbb = bcoords.pmrapmdec_to_pmllpmbb(pmra, pmdec, self.get_col('RA'),self.get_col('DEC'), degree=self.degree, epoch=2000.0)
         else:
-            self.pmll_pmbb = bcoords.pmrapmdec_to_pmllpmbb(self.data['pmra'], self.data['pmdec'], self.data['RA'],self.data['DEC'], degree=self.degree, epoch=2000.0)
+            self.pmll_pmbb = bcoords.pmrapmdec_to_pmllpmbb(pmra, pmdec, self.get_col('RA'),self.get_col('DEC'), degree=self.degree, epoch=2000.0)
 
     def calc_covar_pmllpmbb(self):
         self.covar_pmllpmbb = bcoords.cov_pmrapmdec_to_pmllpmbb(self.covar_pmradec,self.data['RA'], self.data['DEC'], degree=self.degree,epoch=2000.0)
@@ -126,7 +131,7 @@ class PMmeasurements:
         """
         Calculates U,V,W
         """
-        self.spacevels = bcoords.vrpmllpmbb_to_vxvyvz(self.data['vlos'],self.pmll_pmbb[:,0]*np.cos(np.radians(self.data['GLAT'])), self.pmll_pmbb[:,1], self.data['GLON'], self.data['GLAT'], self.data['distance'], degree=self.degree)
+        self.spacevels = bcoords.vrpmllpmbb_to_vxvyvz(self.data['vlos'],self.pmll_pmbb[:,0], self.pmll_pmbb[:,1], self.data['GLON'], self.data['GLAT'], self.data['distance'], degree=self.degree)
 
     def calc_spacevel_uncer_var_tensor(self):
         """
@@ -176,13 +181,15 @@ class PMmeasurements:
         #TODO
         - propagate use of this function everywhere internally
         """
-        return self.catalog[colname][self.mask]
+        if 'PM' in colname: # If PM measurement, decide if UCAC or PPXML
+            return self.catalog[self._pmcolname(colname)][self.mask]
+        else:
+            return self.catalog[colname][self.mask]
 
     def get_ages(self):
         """
-        HACK!!!! Taking absolute ages until ln(age) available
         """
-        return np.abs(self.catalog['cannon_AGE'][self.mask])
+        return self.catalog['cannon_AGE'][self.mask]
 
     def get_Ws(self):
         return self.data['GALVZ'] #km/s from Jo
@@ -192,6 +199,16 @@ class PMmeasurements:
 
     def get_sigma2Ws(self):
         return self.spacevel_uncer_var_tensor[:,2,2] #(km.s)**2
+
+    def height_cut(self, maxheight=0.5, heightcol='RC_GALZ'):
+        """
+        Function that updates data mask and cuts on height
+        Eventually could look at different calculations of height
+
+        # Input
+        - maxheight: number of kpc (default = 0.5)
+        """
+        self.mask = np.logical_and(self.mask, np.abs(self.get_col(heightcol)) < maxheight)
 
     def get_tau_radii_vZg_sigma2Ws_container(self,
             max_uncer_variance=10000.):

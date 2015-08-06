@@ -33,11 +33,11 @@ def init_emcee(init_guess, nwalkers):
     p0 = [(init_guess[0]*(1.+i),init_guess[1]*(1.+j),init_guess[2]*(1.+k)) for i,j,k in zip(*randperturb_di)] # (km/s,beta,kpc**-1)
     return p0
 
-def run_emcee(ndim, nwalkers, p0, lnprob_func, lnprob_args):
+def run_emcee(ndim, nwalkers, p0, lnprob_func, lnprob_args, threads=1):
     if (len(lnprob_args)==2):
         sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob_func,
-                args=lnprob_args)
-        sampler.run_mcmc(p0,45000)
+                args=lnprob_args, threads=threads)
+        sampler.run_mcmc(p0,15000)
         return sampler
 
 def plot_and_run_emcee(nexec,ndim, nwalkers, p0, lnprob_func, lnprob_args):
@@ -69,7 +69,8 @@ def lnlh(data, params, hyperparams):
     Ws = data.Ws
     variance_W0, beta_W, inv_scalelen_W = params
     #print ('betaW: {}'.format(beta_W))
-    variances_W = (variance_W0 * np.power((ages/hyperparams.get_age0()), beta_W) * np.exp(-2.*radii*inv_scalelen_W) + hyperparams.get_sigma2Ws())
+    variances_W = (variance_W0 * np.power((ages/hyperparams.get_age0()), beta_W) * 
+            np.exp(-2.*radii*inv_scalelen_W) + hyperparams.get_sigma2Ws())
     return -0.5*np.sum(Ws**2/variances_W) -0.5*np.sum(np.log(variances_W))
 
 def lnprior(params, hyperparams):
@@ -108,7 +109,7 @@ if __name__ == "__main__":
     pmdata = pm_to_vels.PMmeasurements(RCcatalog = pm_to_vels.catalog, biascorrect='dqsou')
     pmdata.to_space_velocties()
     pmdata.UVW_to_galcen()
-    data = pmdata.get_tau_radii_vZg_sigma2Ws_container(max_uncer_variance=200.)
+    data = pmdata.get_tau_radii_vZg_sigma2Ws_container(max_uncer_variance=75.)
     #data = pmdata.get_tau_radii_vZg_sigma2Ws_container()#max_uncer_variance=200.)
     hyperparams = HyperParams(data.sigma2Ws)
     ndim = 3
