@@ -50,10 +50,16 @@ class PMmeasurements:
 
         Also makes sure those PMs are reasonable with > -100 mas/yr cutoff
         """
-        matches = (self.catalog['PMMATCH{}'.format(self._pmcolname_mod)]==1)
-        goodpmRA = (self.catalog[self._pmcolname('PMRA')] > -100.)  # mas/yr
-        goodpmDEC = (self.catalog[self._pmcolname('PMDEC')] > -100.)  # mas/yr
-        self.mask = np.logical_and.reduce((matches, goodpmRA, goodpmDEC))
+        ##matches = (self.catalog['PMMATCH{}'.format(self._pmcolname_mod)]==1)
+        #goodpmRA = (self.catalog[self._pmcolname('PMRA')] > -2700.)  # mas/yr
+        #goodpmDEC = (self.catalog[self._pmcolname('PMDEC')] > -2700.)  # mas/yr
+        goodpmRAerr = np.logical_and(self.catalog[self._pmcolname('PMRA_ERR')] >= 0.,
+                self.catalog[self._pmcolname('PMRA_ERR')] <= 1.5)  # mas/yr
+        goodpmDECerr = np.logical_and(self.catalog[self._pmcolname('PMDEC_ERR')] >= 0.,
+                self.catalog[self._pmcolname('PMDEC_ERR')] <= 1.5)  # mas/yr
+        #self.mask = np.logical_and.reduce((matches, goodpmRA, goodpmDEC, goodpmRAerr, goodpmDECerr))
+        #self.mask = np.logical_and.reduce((matches, goodpmRAerr, goodpmDECerr))
+        self.mask = np.logical_and.reduce((goodpmRAerr, goodpmDECerr))
 
     def get_pm_corr(self):
         """
@@ -94,7 +100,8 @@ class PMmeasurements:
         pmdec_uncer = self.get_col('PMDEC_ERR')
         pmrapmdec_corrcoefs = np.corrcoef(pmra_uncer, pmdec_uncer)
         ###step 2: propogate corresponding errors
-        self.covar_pmradec = np.array([[pmra_uncer**2, pmrapmdec_corrcoefs[0,1]*pmra_uncer*pmdec_uncer], [pmrapmdec_corrcoefs[1,0]*pmra_uncer*pmdec_uncer, pmdec_uncer**2]]).T  #transpose for shape for galpy
+        self.covar_pmradec = np.array([[pmra_uncer**2, pmrapmdec_corrcoefs[0,1]*pmra_uncer*pmdec_uncer], 
+            [pmrapmdec_corrcoefs[1,0]*pmra_uncer*pmdec_uncer, pmdec_uncer**2]]).T  #transpose for shape for galpy
 
     def conv_pmrapmdec_to_pmllpmbb(self):
         ###step 1: convert PM radec to PM l,b
@@ -104,12 +111,11 @@ class PMmeasurements:
             (dpmra,dpmdec) = self.get_pm_corr()#self.biascorrect)
             pmra+= dpmra
             pmdec+= dpmdec
-            self.pmll_pmbb = bcoords.pmrapmdec_to_pmllpmbb(pmra, pmdec, self.get_col('RA'),self.get_col('DEC'), degree=self.degree, epoch=2000.0)
-        else:
-            self.pmll_pmbb = bcoords.pmrapmdec_to_pmllpmbb(pmra, pmdec, self.get_col('RA'),self.get_col('DEC'), degree=self.degree, epoch=2000.0)
+        self.pmll_pmbb = bcoords.pmrapmdec_to_pmllpmbb(pmra, pmdec, self.get_col('RA'),self.get_col('DEC'), degree=self.degree, epoch=2000.0)
 
     def calc_covar_pmllpmbb(self):
-        self.covar_pmllpmbb = bcoords.cov_pmrapmdec_to_pmllpmbb(self.covar_pmradec,self.get_col('RA'), self.get_col('DEC'), degree=self.degree,epoch=2000.0)
+        self.covar_pmllpmbb = bcoords.cov_pmrapmdec_to_pmllpmbb(self.covar_pmradec,self.get_col('RA'), self.get_col('DEC'),
+                degree=self.degree,epoch=2000.0)
 
     def calc_spacevel(self):
         """
@@ -167,18 +173,20 @@ class PMmeasurements:
         #TODO
         - propagate use of this function everywhere internally
         """
-        if 'PM' in colname: # If PM measurement, decide if UCAC or PPXML
+        if ('PM' in colname) or ('GALV' in colname): # If PM measurement, decide if UCAC or PPXML
             return self.catalog[self._pmcolname(colname)][self.mask]
         else:
             return self.catalog[colname][self.mask]
 
     def get_ages(self):
         """
+        Convenient wrapper, nothing more
         """
-        return self.catalog['cannon_AGE'][self.mask]
+        return self.get_col('cannon_AGE')
 
     def get_Ws(self):
-        return self.get_col('GALVZ') #km/s from Jo
+        return self.vRvTvZ_g[2]  #GALVZ equivalent #incorporates bias corrections!1
+        #return self.get_col('GALVZ') #km/s from Jo
 
     def get_radii(self):
         return self.get_col('RC_GALR') #km/s from Jo
@@ -210,14 +218,21 @@ class PMmeasurements:
         """
         self.sigma2W_uncer_cut = max_uncer_variance
         sigma2Ws_mask = self.get_sigma2Ws() < max_uncer_variance
-        age_cut = np.logical_and(self.get_ages()>0.1,self.get_ages()<12)
+        age_cut = np.logical_and(self.get_ages()>0.1,self.get_ages()<14)
         combined_mask = sigma2Ws_mask & age_cut
-        print(np.sum(combined_mask))
-        data_container = self.Data(ages=self.get_ages()[combined_mask],
-                radii=self.get_radii()[combined_mask],
-                Ws=self.get_Ws()[combined_mask],
-                sigma2Ws=self.get_sigma2Ws()[combined_mask])
+        self.combined_mask = combined_mask
+        print("N:{}".format(np.sum(self.mask)))
+        data_container = self.Data(ages=self.get_ages(),
+                radii=self.get_radii(),
+                Ws=self.get_Ws(),
+                sigma2Ws=self.get_sigma2Ws())
         return data_container
+
+#data_container = self.Data(ages=self.get_ages()[combined_mask],
+#radii=self.get_radii()[combined_mask],
+#Ws=self.get_Ws()[combined_mask],
+#sigma2Ws=self.get_sigma2Ws()[combined_mask])
+#return data_container
 
 ###Abandoned, left for dead until further notice    
 #print (self.data['GLON'][:10], "8")

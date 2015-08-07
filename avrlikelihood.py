@@ -37,7 +37,7 @@ def run_emcee(ndim, nwalkers, p0, lnprob_func, lnprob_args, threads=1):
     if (len(lnprob_args)==2):
         sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob_func,
                 args=lnprob_args, threads=threads)
-        sampler.run_mcmc(p0,15000)
+        sampler.run_mcmc(p0,45000)
         return sampler
 
 def plot_and_run_emcee(nexec,ndim, nwalkers, p0, lnprob_func, lnprob_args):
@@ -58,7 +58,7 @@ def lnlh(data, params, hyperparams):
             shape (3,N)
     - params: variance_W0, beta_W, inv_scalelen_W
               shape (3)
-    - hyperpars: Various getters,read source
+    - hyperpars: Needs to have various getters, read source
 
     # Bugs
     - This is really brittle, it is only there to serve a single customer
@@ -69,9 +69,9 @@ def lnlh(data, params, hyperparams):
     Ws = data.Ws
     variance_W0, beta_W, inv_scalelen_W = params
     #print ('betaW: {}'.format(beta_W))
-    variances_W = (variance_W0 * np.power((ages/hyperparams.get_age0()), beta_W) * 
-            np.exp(-2.*radii*inv_scalelen_W) + hyperparams.get_sigma2Ws())
-    return -0.5*np.sum(Ws**2/variances_W) -0.5*np.sum(np.log(variances_W))
+    variances_W = (variance_W0 * np.power(( ages / hyperparams.get_age0()), 2. * beta_W) *
+            np.exp(-2. * radii * inv_scalelen_W) + hyperparams.get_sigma2Ws())
+    return -0.5 * np.sum(Ws * Ws / variances_W) -0.5 * np.sum(np.log(variances_W))
 
 def lnprior(params, hyperparams):
     """
@@ -88,7 +88,7 @@ def lnprior(params, hyperparams):
         return -np.Inf
     if inv_scalelen_W < -.1 :# kpc**-1
         return -np.Inf
-    if inv_scalelen_W > .1 : # kpc**-1
+    if inv_scalelen_W > .2 : # kpc**-1
         return -np.Inf
     return 0.
 
@@ -106,15 +106,17 @@ def mk_triangle_plot(sampler, nstart=500):
 
 
 if __name__ == "__main__":
-    pmdata = pm_to_vels.PMmeasurements(RCcatalog = pm_to_vels.catalog, biascorrect='dqsou')
+    pmdata = pm_to_vels.PMmeasurements(RCcatalog = pm_to_vels.catalog, pmcatalog='UCAC')#,biascorrect='dgalu')
+    #pmdata = pm_to_vels.PMmeasurements(RCcatalog = pm_to_vels.catalog)#,biascorrect='dgalu')
+    pmdata.height_cut(maxheight = 0.85) #kpc
     pmdata.to_space_velocties()
     pmdata.UVW_to_galcen()
-    data = pmdata.get_tau_radii_vZg_sigma2Ws_container(max_uncer_variance=75.)
+    data = pmdata.get_tau_radii_vZg_sigma2Ws_container()#kkmax_uncer_variance=100.)
     #data = pmdata.get_tau_radii_vZg_sigma2Ws_container()#max_uncer_variance=200.)
     hyperparams = HyperParams(data.sigma2Ws)
     ndim = 3
     nwalkers = 20
-    init_guess = (225.0, 0.2, 0.06) #km/s,beta,kpc**-1 param guesses
+    init_guess = (225.0, 0.35, 0.06) #km/s,beta,kpc**-1 param guesses
     p0 = init_emcee(init_guess,nwalkers)
     plot_and_run_emcee(nexec=1, ndim=ndim, nwalkers=nwalkers, p0=p0, lnprob_func=lnprob, lnprob_args=[data,hyperparams])
     #emcee_sampler = run_emcee(ndim=ndim, nwalkers=nwalkers, p0=p0, lnprob_func=lnprob, lnprob_args=[data,hyperparams])

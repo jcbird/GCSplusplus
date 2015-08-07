@@ -16,6 +16,17 @@ import numpy as np
 #import numpy as np
 import numpy.lib.recfunctions as rfn
 
+_cannon_cat_file = "redclump_sample_A.txt"
+_homedir = os.path.expanduser('~')
+_apogee_data_dir = os.path.join(_homedir, 'obs_data/apogee')
+
+def read_ness_cat():
+    """
+    Just APOGEEID and Ages
+    """
+    ness_age_cat_file = os.path.join(_apogee_data_dir, _cannon_cat_file)
+    ness_cat = np.genfromtxt(ness_age_cat_file, dtype="|S18,f4", usecols=(0,-2), names=['ID', 'AGE']) # ID, Gyr
+    return ness_cat
 
 def returncat():
     homedir = os.path.expanduser('~')
@@ -30,17 +41,18 @@ def returncat():
     ness_dtypes=[RCcat[field].dtype for field in fields]
     ness_fields = ['APOGEE_ID', 'RC_DIST', 'RC_GALR', 'RC_GALPHI', 'RC_GALZ', 'TEFF', 'LOGG', 'FE_H', 'ALPHAFE', 'AGE']
     ndtypes = [(i,j) for i,j in zip(ness_fields, ness_dtypes)]
-    ness_cat = np.genfromtxt(ness_age_cat_file, dtype=ndtypes)
+    ###ness_cat = np.genfromtxt(ness_age_cat_file, dtype=ndtypes)
+    ness_cat = read_ness_cat()
 
-    ###can write out record array here and now
+    #TEST NESS CAT
+    if (ness_cat['ID']==RCcat['APOGEE_ID']).all():
+        print("Ness Catalog and RC Catalog successfully merged.")  #proper ordering
+        print('RC catalog and Cannon catalog have matching APOGEE_IDs')
+    else:
+        print("Ness Catalog merge unsuccessful. You lose!")
+        sys.exit()
 
-    ###
-    ### After this, change the columns for the merging
-    print((RCcat['APOGEE_ID']==ness_cat['APOGEE_ID']).all())
-    print('RC catalog and Cannon catalog have matching APOGEE_IDs')
-    print([(np.allclose(RCcat[i],ness_cat[i])) for i in ness_fields[1:5]])
-    print('RC catalog and Cannon catalog have matching {}'.format(','.join(ness_fields[1:5])))
-    newnames = ["cannon_"+i for i in ness_fields]
+    newnames = ["cannon_"+i for i in ness_cat.dtype.names]
     ness_cat.dtype.names=newnames
 
     ### Just add in delta corrections from PPMXL
