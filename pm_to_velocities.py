@@ -7,7 +7,7 @@ from collections import namedtuple
 catalog = utils.returncat()
 
 
-class PMmeasurements:
+class PMmeasurements(object):  #New style class
     """
     Class to contain PMs and errors. This will make it each to switch between UCAC and PMXXL later.
 
@@ -28,14 +28,40 @@ class PMmeasurements:
     - 2015-08-03 Assuming 5% distance errors to calc spacevels.
     - 2015-08-03 Fork Galpy and rewrite conv to galcencycl coords.
     """
-    def __init__(self,pmcatalog='PPMXL', RCcatalog=catalog, biascorrect=None):
+    colmod_lookup = {'PPMXL' : '_PPMXL', 'UCAC' : ''} #Dict lookup
+    # for column names in RCcatalog
+
+    def __init__(self,pmcatalog='UCAC', RCcatalog=catalog, biascorrect=None, degree=True):
         self.pmcatalog = pmcatalog
-        self.catalog = catalog
-        self._pmcolname_mod = '_PPMXL' if pmcatalog=='PPMXL' else ''
-        self.degree = True #RA,DEC in degrees
-        self.biascorrect = biascorrect
+        self.catalog = catalog    # RC catalog w/ages
+        self._pmcolname_mod = PMmeasurements.colmod_lookup.get(pmcatalog,'') #default: UCAC
+        self.maxheight = None  # [kpc] for cut sample close to the plane
+        self.maxpmuncer = self.set_maxpmuncer(None) # [mas/yr] for cut sample by PM uncertainty
+        self.degree = degree #RA,DEC in degrees, set to false otherwise
+        self.biascorrect = biascorrect  #ignoring this for now, not using PPMXL
+        self._generatemask() # create mask over data to be used
+
+    ## Write now explicity writing getter/setter, should do property!
+    def set_maxpmuncer(self, maxpmuncer):
+        """
+        Cut the catalog in PM uncertainty. Take everything by default
+        Auto-updates mask.
+        """
+        if maxpmuncer is None:
+            maxpmuncer = np.max((self.catalog[self._pmcolname('PMRA_ERR')],
+                self.catalog[self._pmcolname('PMDEC_ERR')]))
+        self.maxpmuncer = maxpmuncer
         self._generatemask()
-        self.Data = namedtuple('Data', ['ages', 'radii', 'Ws', 'sigma2Ws'])
+
+    def set_maxheight(self, maxheight):
+        """
+        Cut the catalog by Z height above plane. 
+        Auto-updates mask.
+        """
+        if maxheight is None:
+            maxheight = np.abs(self.catalog['RC_GALZ']).max()
+        self.maxheight = maxheight
+        self._generatemask()
 
     def _pmcolname(self,basename):
         """
@@ -43,23 +69,31 @@ class PMmeasurements:
         """
         return '{0}{1}'.format(basename,self._pmcolname_mod)
 
-    def _generatemask(self):
+    def _generatemask(self, init = False):
         """
         Uses 'match' arrays to build boolean mask that finds all stars with PM matches 
         corresponding to the catalog used. Mask applied to catalog before conversion
 
         Also makes sure those PMs are reasonable with > -100 mas/yr cutoff
+        # Inputs
+        - init: [False]  if True will reset mask and start anew
+
+        # Checked quantities
+        - pm uncertainties: always checked, by default 100 mas/yr cutoff
+        - maxheight: optional, height of stars from midplane, uses RCcat
+        - matches: Demands match from single PM catalog (for now)
+
+        # If AGE mask needed, put here
         """
-        ##matches = (self.catalog['PMMATCH{}'.format(self._pmcolname_mod)]==1)
-        #goodpmRA = (self.catalog[self._pmcolname('PMRA')] > -2700.)  # mas/yr
-        #goodpmDEC = (self.catalog[self._pmcolname('PMDEC')] > -2700.)  # mas/yr
+        matches = (self.catalog['PMMATCH{}'.format(self._pmcolname_mod)]==1)
+        # setting above 0 below makes sure of no -9999 vals
         goodpmRAerr = np.logical_and(self.catalog[self._pmcolname('PMRA_ERR')] >= 0.,
-                self.catalog[self._pmcolname('PMRA_ERR')] <= 1.5)  # mas/yr
+                self.catalog[self._pmcolname('PMRA_ERR')] <= self.maxpmuncer)  # mas/yr
         goodpmDECerr = np.logical_and(self.catalog[self._pmcolname('PMDEC_ERR')] >= 0.,
-                self.catalog[self._pmcolname('PMDEC_ERR')] <= 1.5)  # mas/yr
-        #self.mask = np.logical_and.reduce((matches, goodpmRA, goodpmDEC, goodpmRAerr, goodpmDECerr))
-        #self.mask = np.logical_and.reduce((matches, goodpmRAerr, goodpmDECerr))
-        self.mask = np.logical_and.reduce((goodpmRAerr, goodpmDECerr))
+                self.catalog[self._pmcolname('PMDEC_ERR')] <= self.maxpmuncer)  # mas/yr
+        goodHeight = (np.abs(self.catalog['RC_GALZ'])< self.maxheight)
+        self.mask = np.logical_and.reduce((goodpmRAerr, goodpmDECerr,
+            matches, goodHeight))
 
     def get_pm_corr(self):
         """
@@ -184,6 +218,7 @@ class PMmeasurements:
         """
         return self.get_col('cannon_AGE')
 
+    # THESE Getters should be properties ! TODO
     def get_Ws(self):
         return self.vRvTvZ_g[2]  #GALVZ equivalent #incorporates bias corrections!1
         #return self.get_col('GALVZ') #km/s from Jo
@@ -206,7 +241,7 @@ class PMmeasurements:
         - reference to self.catalog is correct. When creating mask, always
           do so on full catalog
         """
-        self.mask = np.logical_and(self.mask, np.abs(self.catalog[heightcol]) < maxheight)
+        self.set_maxheight(maxheight) #mask = np.logical_and(self.mask, np.abs(self.catalog[heightcol]) < maxheight)
 
     def get_tau_radii_vZg_sigma2Ws_container(self,
             max_uncer_variance=10000.):
