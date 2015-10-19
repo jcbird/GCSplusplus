@@ -1,12 +1,11 @@
 """Triangle plots in data space
 
-TODO Use PMtovels class to mask out bad data
 """
 # Modules
 import os
 import sys
 import numpy as np
-import triangle
+import corner
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pm_to_velocities as pmtovel
 
@@ -33,6 +32,15 @@ def load_cat(**PMkwargs):
     """
     pmcont = pmtovel.PMmeasurements(**PMkwargs)
     return pmcont
+
+
+def triangle_plot(data, labels, **kwargs):
+    corner_plt_kwds = {'show_titles':True, title_args:{"fontsize":12}}
+    if kwargs is not None:
+        corner_plt_kwds.update(kwargs)
+    fig = plt.figure()
+    corner.corner(data, labels, fig=fig, **corner_plt_kwds)
+    return fig
 
 
 if (__name__ == '__main__') and (__package__ is None):

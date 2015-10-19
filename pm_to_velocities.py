@@ -75,7 +75,7 @@ class PMmeasurements(object):  # New style class
         """
         return '{0}{1}'.format(basename, self._pmcolname_mod)
 
-    def _generatemask(self, init=False):
+    def _generatemask(self, addmask=None, init=False):
         """
         Uses 'match' arrays to build boolean mask that finds all stars with PM
         matches corresponding to the catalog used. Mask applied to catalog
@@ -94,15 +94,21 @@ class PMmeasurements(object):  # New style class
         """
         matches = (self.catalog['PMMATCH{}'.format(self._pmcolname_mod)] == 1)
         # setting above 0 below makes sure of no -9999 vals
-        goodpmRAerr = np.logical_and(self.catalog[self._pmcolname('PMRA_ERR')] >= 0.,
+        goodpmRAerr = np.logical_and(self.catalog[self._pmcolname('PMRA_ERR')] >=
+                                     0.,
                                      self.catalog[self._pmcolname('PMRA_ERR')] <=
                                      self.maxpmuncer)  # mas/yr
         goodpmDECerr = np.logical_and(self.catalog[self._pmcolname('PMDEC_ERR')] >=
-                                      0., self.catalog[self._pmcolname('PMDEC_ERR')] <=
+                                      0.,
+                                      self.catalog[self._pmcolname('PMDEC_ERR')] <=
                                       self.maxpmuncer)  # mas/yr
         goodHeight = (np.abs(self.catalog['RC_GALZ']) < self.maxheight)
-        self.mask = np.logical_and.reduce((goodpmRAerr, goodpmDECerr,
-                                           matches, goodHeight))
+        if addmask is not None:
+            self.mask = np.logical_and.reduce((goodpmRAerr, goodpmDECerr,
+                                               matches, goodHeight, addmask))
+        else:
+            self.mask = np.logical_and.reduce((goodpmRAerr, goodpmDECerr,
+                                               matches, goodHeight))
 
     def get_pm_corr(self):
         """
@@ -282,7 +288,7 @@ class PMmeasurements(object):  # New style class
         - reference to self.catalog is correct. When creating mask, always
           do so on full catalog
         """
-        self.set_maxheight(maxheight) #mask = np.logical_and(self.mask, np.abs(self.catalog[heightcol]) < maxheight)
+        self.set_maxheight(maxheight)
 
     def get_tau_radii_vZg_sigma2Ws_container(self,
                                              max_uncer_variance=10000.):
@@ -303,31 +309,3 @@ class PMmeasurements(object):  # New style class
                                    Ws=self.get_Ws(),
                                    sigma2Ws=self.get_sigma2Ws())
         return data_container
-
-#data_container = self.Data(ages=self.get_ages()[combined_mask],
-#radii=self.get_radii()[combined_mask],
-#Ws=self.get_Ws()[combined_mask],
-#sigma2Ws=self.get_sigma2Ws()[combined_mask])
-#return data_container
-
-###Abandoned, left for dead until further notice    
-#print (self.data['GLON'][:10], "8")
-#self.rectgal = bcoords.sphergal_to_rectgal(self.data['GLON'], self.data['GLAT'], self.data['distance'], self.data['vlos'], self.pmll_pmbb[:,0], self.pmll_pmbb[:,1], degree=False)
-#
-
-
-
-
-#need to convert PMs and errors into velocities and errors
-
-###use pmrapmdec_to_pmllpmbb(pmra,pmdec,ra,dec,degree=False,epoch=2000.0)
-###cov_pmrapmdec_to_pmllpmbb(cov_pmradec,ra,dec,degree=False,epoch=2000.0)
-###step 3: convert l,b,d,rv to space velocities
-###vrpmllpmbb_to_vxvyvz(vr,pmll,pmbb,l,b,d,XYZ=False,degree=False)
-###step 4: propagate errors as welll
-###cov_dvrpmllbb_to_vxyz(d,e_d,e_vr,pmll,pmbb,cov_pmllbb,l,b,
-###                                  plx=False,degree=False)
-###
-
-
-# def vrpmllpmbb_to_vxvyvz(vr,pmll,pmbb,l,b,d,XYZ=False,degree=False):
