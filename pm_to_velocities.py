@@ -1,5 +1,4 @@
 import numpy as np
-import galpy
 from galpy.util import bovy_coords as bcoords
 import utils
 from collections import namedtuple
@@ -7,16 +6,19 @@ from collections import namedtuple
 catalog = utils.returncat()
 
 
-class PMmeasurements(object):  #New style class
+class PMmeasurements(object):  # New style class
     """
-    Class to contain PMs and errors. This will make it each to switch between UCAC and PMXXL later.
+    Class to contain PMs and errors. This will make it each to switch between
+    UCAC and PMXXL later.
 
     # Inputs
     - biascorect  (string) 'dqsou', 'dgalu', 'ppmxl'
-                  'dqsou' and 'dgalu' refer to interpolated corrections from Bertrand (see HWR email
-                  from 2015-08-04) using either quasars or galaxies as a reference objects.
-                  'ppmxl' uses mean velocity of entire ppmxl catalog as a function of position
-                  PPMXL NOT IMPLIMENTED
+                  'dqsou' and 'dgalu' refer to interpolated corrections
+                  from Bertrand (see HWR email from 2015-08-04) using either
+                  quasars or galaxies as a reference objects.
+                  'ppmxl' uses mean velocity of entire ppmxl catalog as a
+                  function of position
+                  PPMXL NOT YET IMPLIMENTED
     # Bugs
     - galpy:   rewrites the input l,b; need to fork and fix
         + Hack: change degree keyword to False for conversions (NASTY)
@@ -28,18 +30,20 @@ class PMmeasurements(object):  #New style class
     - 2015-08-03 Assuming 5% distance errors to calc spacevels.
     - 2015-08-03 Fork Galpy and rewrite conv to galcencycl coords.
     """
-    colmod_lookup = {'PPMXL' : '_PPMXL', 'UCAC' : ''} #Dict lookup
+    colmod_lookup = {'PPMXL': '_PPMXL', 'UCAC': ''}  # Dict lookup
     # for column names in RCcatalog
 
-    def __init__(self,pmcatalog='UCAC', RCcatalog=catalog, biascorrect=None, degree=True):
+    def __init__(self, pmcatalog='UCAC', RCcatalog=catalog, biascorrect=None,
+                 degree=True, maxheight=None, maxpmuncer=None):
         self.pmcatalog = pmcatalog
         self.catalog = catalog    # RC catalog w/ages
-        self._pmcolname_mod = PMmeasurements.colmod_lookup.get(pmcatalog,'') #default: UCAC
-        self.maxheight = None  # [kpc] for cut sample close to the plane
-        self.maxpmuncer = self.set_maxpmuncer(None) # [mas/yr] for cut sample by PM uncertainty
-        self.degree = degree #RA,DEC in degrees, set to false otherwise
-        self.biascorrect = biascorrect  #ignoring this for now, not using PPMXL
-        self._generatemask() # create mask over data to be used
+        self._pmcolname_mod = PMmeasurements.colmod_lookup.get(pmcatalog, '')
+        # default: UCAC
+        self.set_maxheight(maxheight)  # [kpc] to cut sample close to the plane
+        self.set_maxpmuncer(maxpmuncer)  # [mas/yr] cut sample by PM uncer
+        self.degree = degree  # RA,DEC in degrees, set to false otherwise
+        self.biascorrect = biascorrect  # ignoring this, not using PPMXL
+        self._generatemask()  # create mask over data to be used
 
     ## Write now explicity writing getter/setter, should do property!
     def set_maxpmuncer(self, maxpmuncer):
@@ -49,30 +53,33 @@ class PMmeasurements(object):  #New style class
         """
         if maxpmuncer is None:
             maxpmuncer = np.max((self.catalog[self._pmcolname('PMRA_ERR')],
-                self.catalog[self._pmcolname('PMDEC_ERR')]))
+                                 self.catalog[self._pmcolname('PMDEC_ERR')]))
         self.maxpmuncer = maxpmuncer
-        self._generatemask()
+        # if getattr(self, 'maxheight', None) is not None:
+        #     self._generatemask()
 
     def set_maxheight(self, maxheight):
         """
-        Cut the catalog by Z height above plane. 
-        Auto-updates mask.
+        Cut the catalog by Z height above plane.
+        Auto-updates mask if maxpmuncer exists
         """
         if maxheight is None:
             maxheight = np.abs(self.catalog['RC_GALZ']).max()
         self.maxheight = maxheight
-        self._generatemask()
+        # if getattr(self, 'maxpmuncer', None) is not None:
+        #     self._generatemask()
 
-    def _pmcolname(self,basename):
+    def _pmcolname(self, basename):
         """
         Puts PM catalog ID in string for getters
         """
-        return '{0}{1}'.format(basename,self._pmcolname_mod)
+        return '{0}{1}'.format(basename, self._pmcolname_mod)
 
-    def _generatemask(self, init = False):
+    def _generatemask(self, init=False):
         """
-        Uses 'match' arrays to build boolean mask that finds all stars with PM matches 
-        corresponding to the catalog used. Mask applied to catalog before conversion
+        Uses 'match' arrays to build boolean mask that finds all stars with PM
+        matches corresponding to the catalog used. Mask applied to catalog
+        before conversion.
 
         Also makes sure those PMs are reasonable with > -100 mas/yr cutoff
         # Inputs
@@ -85,15 +92,17 @@ class PMmeasurements(object):  #New style class
 
         # If AGE mask needed, put here
         """
-        matches = (self.catalog['PMMATCH{}'.format(self._pmcolname_mod)]==1)
+        matches = (self.catalog['PMMATCH{}'.format(self._pmcolname_mod)] == 1)
         # setting above 0 below makes sure of no -9999 vals
         goodpmRAerr = np.logical_and(self.catalog[self._pmcolname('PMRA_ERR')] >= 0.,
-                self.catalog[self._pmcolname('PMRA_ERR')] <= self.maxpmuncer)  # mas/yr
-        goodpmDECerr = np.logical_and(self.catalog[self._pmcolname('PMDEC_ERR')] >= 0.,
-                self.catalog[self._pmcolname('PMDEC_ERR')] <= self.maxpmuncer)  # mas/yr
-        goodHeight = (np.abs(self.catalog['RC_GALZ'])< self.maxheight)
+                                     self.catalog[self._pmcolname('PMRA_ERR')] <=
+                                     self.maxpmuncer)  # mas/yr
+        goodpmDECerr = np.logical_and(self.catalog[self._pmcolname('PMDEC_ERR')] >=
+                                      0., self.catalog[self._pmcolname('PMDEC_ERR')] <=
+                                      self.maxpmuncer)  # mas/yr
+        goodHeight = (np.abs(self.catalog['RC_GALZ']) < self.maxheight)
         self.mask = np.logical_and.reduce((goodpmRAerr, goodpmDECerr,
-            matches, goodHeight))
+                                           matches, goodHeight))
 
     def get_pm_corr(self):
         """
@@ -122,10 +131,10 @@ class PMmeasurements(object):  #New style class
         else:
             print('ppmxl mean PM correction not available yet')
 
-
     def calc_covar_pmrapmdec(self):
         """
-        Calculates covariance matrix of PM uncertainties at the input measurement level (RA,DEC)
+        Calculates covariance matrix of PM uncertainties at the input
+        measurement level (RA,DEC)
 
         # Notes
         - Locally renamed variables to be clear about uncertainties vs. errors
@@ -133,48 +142,73 @@ class PMmeasurements(object):  #New style class
         pmra_uncer = self.get_col('PMRA_ERR')
         pmdec_uncer = self.get_col('PMDEC_ERR')
         pmrapmdec_corrcoefs = np.corrcoef(pmra_uncer, pmdec_uncer)
-        ###step 2: propogate corresponding errors
-        self.covar_pmradec = np.array([[pmra_uncer**2, pmrapmdec_corrcoefs[0,1]*pmra_uncer*pmdec_uncer], 
-            [pmrapmdec_corrcoefs[1,0]*pmra_uncer*pmdec_uncer, pmdec_uncer**2]]).T  #transpose for shape for galpy
+        # step 2: propogate corresponding errors
+        covpm = np.array([[pmra_uncer**2,
+                           pmrapmdec_corrcoefs[0, 1]*pmra_uncer*pmdec_uncer],
+                          [pmrapmdec_corrcoefs[1, 0]*pmra_uncer*pmdec_uncer,
+                           pmdec_uncer**2]]).T  # transpose for shape for galpy
+        self.covar_pmradec = covpm  # For style reasons
 
     def conv_pmrapmdec_to_pmllpmbb(self):
-        ###step 1: convert PM radec to PM l,b
+        # step 1: convert PM radec to PM l,b
         pmra = self.get_col('PMRA')
         pmdec = self.get_col('PMDEC')
         if self.biascorrect is not None:
-            (dpmra,dpmdec) = self.get_pm_corr()#self.biascorrect)
-            pmra+= dpmra
-            pmdec+= dpmdec
-        self.pmll_pmbb = bcoords.pmrapmdec_to_pmllpmbb(pmra, pmdec, self.get_col('RA'),self.get_col('DEC'), degree=self.degree, epoch=2000.0)
+            (dpmra, dpmdec) = self.get_pm_corr()
+            pmra += dpmra
+            pmdec += dpmdec
+        self.pmll_pmbb = bcoords.pmrapmdec_to_pmllpmbb(pmra, pmdec,
+                                                       self.get_col('RA'),
+                                                       self.get_col('DEC'),
+                                                       degree=self.degree,
+                                                       epoch=2000.0)
 
     def calc_covar_pmllpmbb(self):
-        self.covar_pmllpmbb = bcoords.cov_pmrapmdec_to_pmllpmbb(self.covar_pmradec,self.get_col('RA'), self.get_col('DEC'),
-                degree=self.degree,epoch=2000.0)
+        covpmllbb = bcoords.cov_pmrapmdec_to_pmllpmbb(self.covar_pmradec,
+                                                      self.get_col('RA'),
+                                                      self.get_col('DEC'),
+                                                      degree=self.degree,
+                                                      epoch=2000.0)
+        self.covar_pmllpmbb = covpmllbb
 
     def calc_spacevel(self):
         """
         Calculates U,V,W
         """
-        self.spacevels = bcoords.vrpmllpmbb_to_vxvyvz(self.get_col('VHELIO_AVG'), self.pmll_pmbb[:,0], self.pmll_pmbb[:,1], self.get_col('GLON'), 
-                self.get_col('GLAT'), self.get_col('RC_DIST'), degree=self.degree)
+        uvw = bcoords.vrpmllpmbb_to_vxvyvz(self.get_col('VHELIO_AVG'),
+                                           self.pmll_pmbb[:, 0],
+                                           self.pmll_pmbb[:, 1],
+                                           self.get_col('GLON'),
+                                           self.get_col('GLAT'),
+                                           self.get_col('RC_DIST'),
+                                           degree=self.degree)
+
+        self.spacevels = uvw
 
     def calc_spacevel_uncer_var_tensor(self):
         """
         Right now assumes ZERO error in RV (km/s) and 5% distance errors
         """
         dist_uncer = 0.05 * self.get_col('RC_DIST')
-        self.spacevel_uncer_var_tensor = bcoords.cov_dvrpmllbb_to_vxyz(self.get_col('RC_DIST'), dist_uncer, np.zeros_like(self.get_col('VHELIO_AVG')),
-                self.pmll_pmbb[:,0], self.pmll_pmbb[:,1], self.covar_pmllpmbb, self.get_col('GLON'), self.get_col('GLAT'), degree=self.degree)
+        uncer_tensor = bcoords.cov_dvrpmllbb_to_vxyz(self.get_col('RC_DIST'),
+                               dist_uncer,
+                               np.zeros_like(self.get_col('VHELIO_AVG')),
+                               self.pmll_pmbb[:, 0], self.pmll_pmbb[:, 1],
+                               self.covar_pmllpmbb, self.get_col('GLON'),
+                               self.get_col('GLAT'), degree=self.degree)
+        self.spacevel_uncer_var_tensor = uncer_tensor
 
     def to_space_velocties(self):
         """
         Wrapper around galpy, and wrapper to go through steps to calc UVW
-        
         """
         self.conv_pmrapmdec_to_pmllpmbb()
         self.calc_covar_pmrapmdec()
         self.calc_covar_pmllpmbb()
-        self.XYZ = np.array(bcoords.lbd_to_XYZ(self.get_col('GLON'), self.get_col('GLAT'), self.get_col('RC_DIST'), degree=True))
+        self.XYZ = np.array(bcoords.lbd_to_XYZ(self.get_col('GLON'),
+                                               self.get_col('GLAT'),
+                                               self.get_col('RC_DIST'),
+                                               degree=True))
         self.calc_spacevel()
         self.calc_spacevel_uncer_var_tensor()
 
@@ -195,9 +229,15 @@ class PMmeasurements(object):  #New style class
         vRg, vTg, vZg  # km/s
 
         """
-        self.vRvTvZ_g = bcoords.vxvyvz_to_galcencyl(self.spacevels[:,0], self.spacevels[:,1], self.spacevels[:,2],
-                self.get_col('RC_GALR'), self.get_col('RC_GALPHI'), self.get_col('RC_GALZ'), vsun=[-11.1,30.24*8.,7.2], galcen=True)
-        ###BEWARE, HACK TIME
+        self.vRvTvZ_g = bcoords.vxvyvz_to_galcencyl(self.spacevels[:, 0],
+                                                    self.spacevels[:, 1],
+                                                    self.spacevels[:, 2],
+                                                    self.get_col('RC_GALR'),
+                                                    self.get_col('RC_GALPHI'),
+                                                    self.get_col('RC_GALZ'),
+                                                    vsun=[-11.1, 30.24*8., 7.2],
+                                                    galcen=True)
+        # BEWARE, HACK TIME
 
     def get_col(self, colname):
         """
@@ -207,7 +247,8 @@ class PMmeasurements(object):  #New style class
         #TODO
         - propagate use of this function everywhere internally
         """
-        if ('PM' in colname) or ('GALV' in colname): # If PM measurement, decide if UCAC or PPXML
+        if ('PM' in colname) or ('GALV' in colname):
+            # If PM measurement, decide if UCAC or PPXML
             return self.catalog[self._pmcolname(colname)][self.mask]
         else:
             return self.catalog[colname][self.mask]
@@ -244,7 +285,7 @@ class PMmeasurements(object):  #New style class
         self.set_maxheight(maxheight) #mask = np.logical_and(self.mask, np.abs(self.catalog[heightcol]) < maxheight)
 
     def get_tau_radii_vZg_sigma2Ws_container(self,
-            max_uncer_variance=10000.):
+                                             max_uncer_variance=10000.):
         """
         WEIRD NAME: reminds me that need to propagate sigma2Ws to sigma2vZg
         Propagates velocity uncertainty cut to data
@@ -253,14 +294,14 @@ class PMmeasurements(object):  #New style class
         """
         self.sigma2W_uncer_cut = max_uncer_variance
         sigma2Ws_mask = self.get_sigma2Ws() < max_uncer_variance
-        age_cut = np.logical_and(self.get_ages()>0.1,self.get_ages()<14)
+        age_cut = np.logical_and(self.get_ages() > 0.1, self.get_ages() < 14)
         combined_mask = sigma2Ws_mask & age_cut
         self.combined_mask = combined_mask
         print("N:{}".format(np.sum(self.mask)))
         data_container = self.Data(ages=self.get_ages(),
-                radii=self.get_radii(),
-                Ws=self.get_Ws(),
-                sigma2Ws=self.get_sigma2Ws())
+                                   radii=self.get_radii(),
+                                   Ws=self.get_Ws(),
+                                   sigma2Ws=self.get_sigma2Ws())
         return data_container
 
 #data_container = self.Data(ages=self.get_ages()[combined_mask],
