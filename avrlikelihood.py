@@ -2,7 +2,7 @@ from __future__ import print_function
 import numpy as np
 import pm_to_velocities as pm_to_vels
 import emcee
-import triangle
+import corner
 
 
 class HyperParams():
@@ -68,9 +68,9 @@ def lnlh(data, params, hyperparams):
     - This is really brittle, it is only there to serve a single customer
 
     """
-    ages = data.ages
-    radii = data.radii
-    Ws = data.Ws
+    ages = data['ages']
+    radii = data['radii']
+    Ws = data['Ws']
     variance_W0, beta_W, inv_scalelen_W = params
     variances_W = (variance_W0 * np.power((ages / hyperparams.get_age0()),
                                           2. * beta_W) *
@@ -109,9 +109,9 @@ def lnprob(params, data, hyperparams):
 
 def mk_triangle_plot(sampler, nstart=500):
     samples = sampler.chain[:, nstart:, :].reshape((-1, 3))
-    fig = triangle.corner(samples, labels=[r"$S_{W_0}$ [km$^2$/s$^2$]",
-                                           r"$\beta$",
-                                           r"$R_{W_0}^{-1}$ [kpc]"])
+    fig = corner.corner(samples, labels=[r"$S_{W_0}$ [km$^2$/s$^2$]",
+                                         r"$\beta$",
+                                         r"$R_{W_0}^{-1}$ [kpc]"])
     fig.savefig("triangle0.png")
 
 
@@ -122,7 +122,7 @@ if __name__ == "__main__":
     pmdata.to_space_velocties()
     pmdata.UVW_to_galcen()
     data = pmdata.get_tau_radii_vZg_sigma2Ws_container()
-    hyperparams = HyperParams(data.sigma2Ws)
+    hyperparams = HyperParams(data['sigma2Ws'])
     ndim = 3
     nwalkers = 20
     init_guess = (225.0, 0.35, 0.06)  # km/s,beta,kpc**-1 param guesses

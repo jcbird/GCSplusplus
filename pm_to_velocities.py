@@ -45,7 +45,7 @@ class PMmeasurements(object):  # New style class
         self.biascorrect = biascorrect  # ignoring this, not using PPMXL
         self._generatemask()  # create mask over data to be used
 
-    ## Write now explicity writing getter/setter, should do property!
+    # Write now explicity writing getter/setter, should do property!
     def set_maxpmuncer(self, maxpmuncer):
         """
         Cut the catalog in PM uncertainty. Take everything by default
@@ -304,8 +304,8 @@ class PMmeasurements(object):  # New style class
         combined_mask = sigma2Ws_mask & age_cut
         self.combined_mask = combined_mask
         print("N:{}".format(np.sum(self.mask)))
-        data_container = self.Data(ages=self.get_ages(),
-                                   radii=self.get_radii(),
-                                   Ws=self.get_Ws(),
-                                   sigma2Ws=self.get_sigma2Ws())
+        data_container = {'ages': self.get_ages(),
+                          'radii': self.get_radii(),
+                          'Ws': self.get_Ws(),
+                          'sigma2Ws': self.get_sigma2Ws()}
         return data_container
