@@ -2,13 +2,12 @@
 
 """
 # Modules
-import os
-import sys
 import numpy as np
 import corner
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import os
+import sys
+sys.path.insert(1, os.path.join(sys.path[0], '..'))
 import pm_to_velocities as pmtovel
-
 
 def get_data(pm_instance, *quantities):
     """
@@ -35,11 +34,11 @@ def load_cat(**PMkwargs):
 
 
 def triangle_plot(data, labels, **kwargs):
-    corner_plt_kwds = {'show_titles':True, title_args:{"fontsize":12}}
+    print(kwargs)
+    corner_plt_kwds = {'show_titles': True, 'title_args': {"fontsize": 12}}
     if kwargs is not None:
         corner_plt_kwds.update(kwargs)
-    fig = plt.figure()
-    corner.corner(data, labels, fig=fig, **corner_plt_kwds)
+    fig = corner.corner(data, labels=labels, **corner_plt_kwds)
     return fig
 
 
@@ -52,5 +51,5 @@ if (__name__ == '__main__') and (__package__ is None):
     quants = ['PMRA_ERR', 'PMDEC_ERR', 'RC_GALR', 'RC_GALZ', 'cannon_AGE']
     tridata = get_data(pms, *quants)
     tridata = np.column_stack([tridata, Wvel])
-    figure = triangle.corner(tridata, labels=quants+['W'])
+    figure = corner.corner(tridata, labels=quants+['W'])
     figure.savefig('data_correlations.png', format='png')

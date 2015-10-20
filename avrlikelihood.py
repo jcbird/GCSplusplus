@@ -6,11 +6,12 @@ import triangle
 from collections import namedtuple
 import sys
 
+
 class HyperParams():
     """
     """
     def __init__(self, sigma2Ws):
-        self.age0 = 1.0 #Gyr
+        self.age0 = 1.0  # Gyr
         self.sigma2Ws = sigma2Ws
         self.set_sigma2Ws(sigma2Ws)
 
@@ -24,31 +25,35 @@ class HyperParams():
     def get_sigma2Ws(self):
         return self.sigma2Ws
 
+
 def init_emcee(init_guess, nwalkers):
     """
     - init_guess: shape(ndim), initial guesses of params
     """
-    randperturb_di = [np.random.normal(0,0.015,nwalkers)
-            for i in range(ndim)]
-    p0 = [(init_guess[0]*(1.+i),init_guess[1]*(1.+j),init_guess[2]*(1.+k)) for i,j,k in zip(*randperturb_di)] # (km/s,beta,kpc**-1)
+    randperturb_di = [np.random.normal(0, 0.015, nwalkers)
+                      for i in range(ndim)]
+    p0 = [(init_guess[0]*(1.+i), init_guess[1]*(1.+j), init_guess[2]*(1.+k))
+          for i, j, k in zip(*randperturb_di)]  # (km/s,beta,kpc**-1)
     return p0
 
+
 def run_emcee(ndim, nwalkers, p0, lnprob_func, lnprob_args, threads=1):
-    if (len(lnprob_args)==2):
+    if (len(lnprob_args) == 2):
         sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob_func,
-                args=lnprob_args, threads=threads)
-        sampler.run_mcmc(p0,45000)
+                                        args=lnprob_args, threads=threads)
+        sampler.run_mcmc(p0, 45000)
         return sampler
 
-def plot_and_run_emcee(nexec,ndim, nwalkers, p0, lnprob_func, lnprob_args):
+
+def plot_and_run_emcee(nexec, ndim, nwalkers, p0, lnprob_func, lnprob_args):
     """
     - nexec: Number of times to continue looping emcee and making plot
     """
     sampler = run_emcee(ndim, nwalkers, p0, lnprob_func, lnprob_args)
     mk_triangle_plot(sampler)
-    if nexec>1:
+    if nexec > 1:
         for i in xrange(nexec):
-            sampler = run_emc(ndim, nwalkers, p0, lnprob_func, lnprob_args)
+            sampler = run_emcee(ndim, nwalkers, p0, lnprob_func, lnprob_args)
             mk_triangle_plot(sampler)
 
 def lnlh(data, params, hyperparams):
