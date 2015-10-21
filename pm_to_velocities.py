@@ -300,7 +300,7 @@ class PMmeasurements(object):  # New style class
         """
         self.sigma2W_uncer_cut = max_uncer_variance
         sigma2Ws_mask = self.get_sigma2Ws() < max_uncer_variance
-        age_cut = np.logical_and(self.get_ages() > 0.1, self.get_ages() < 14)
+        age_cut = np.logical_and(self.get_ages() > 0.1, self.get_ages() < 13)
         combined_mask = sigma2Ws_mask & age_cut
         self.combined_mask = combined_mask
         print("N:{}".format(np.sum(self.mask)))
