@@ -6,6 +6,8 @@ from collections import namedtuple
 catalog = utils.returncat()
 
 
+dataout = namedtuple('dataout', ['ages', 'radii', 'Ws', 'sigma2Ws'])
+
 class PMmeasurements(object):  # New style class
     """
     Class to contain PMs and errors. This will make it each to switch between
@@ -249,7 +251,7 @@ class PMmeasurements(object):  # New style class
         """
         Important function to grab column from catalog while applying
         the PMMATCH mask.
-
+bined_mask)
         #TODO
         - propagate use of this function everywhere internally
         """
@@ -301,11 +303,12 @@ class PMmeasurements(object):  # New style class
         self.sigma2W_uncer_cut = max_uncer_variance
         sigma2Ws_mask = self.get_sigma2Ws() < max_uncer_variance
         age_cut = np.logical_and(self.get_ages() > 0.1, self.get_ages() < 13)
-        combined_mask = sigma2Ws_mask & age_cut
-        self.combined_mask = combined_mask
+        post_mask = sigma2Ws_mask & age_cut
+        self.post_mask = post_mask
         print("N:{}".format(np.sum(self.mask)))
-        data_container = {'ages': self.get_ages(),
-                          'radii': self.get_radii(),
-                          'Ws': self.get_Ws(),
-                          'sigma2Ws': self.get_sigma2Ws()}
+        print("After uncertainty cut N:{}".format(np.sum(self.post_mask)))
+        data_container = dataout(ages=self.get_ages()[post_mask],
+                                 radii=self.get_radii()[post_mask],
+                                 Ws=self.get_Ws()[post_mask],
+                                 sigma2Ws=self.get_sigma2Ws()[post_mask])
         return data_container
