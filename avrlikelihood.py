@@ -39,7 +39,7 @@ def run_emcee(ndim, nwalkers, p0, lnprob_func, lnprob_args, threads=1):
     if (len(lnprob_args) == 2):
         sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob_func,
                                         args=lnprob_args, threads=threads)
-        sampler.run_mcmc(p0, 45000)
+        sampler.run_mcmc(p0, 15000)
         return sampler
 
 
@@ -68,9 +68,9 @@ def lnlh(data, params, hyperparams):
     - This is really brittle, it is only there to serve a single customer
 
     """
-    ages = data['ages']
-    radii = data['radii']
-    Ws = data['Ws']
+    ages = data.ages
+    radii = data.radii
+    Ws = data.Ws
     variance_W0, beta_W, inv_scalelen_W = params
     variances_W = (variance_W0 * np.power((ages / hyperparams.get_age0()),
                                           2. * beta_W) *
@@ -117,12 +117,12 @@ def mk_triangle_plot(sampler, nstart=500):
 
 if __name__ == "__main__":
     pmdata = pm_to_vels.PMmeasurements(RCcatalog=pm_to_vels.catalog,
-                                       pmcatalog='UCAC')
+                                       pmcatalog='PPMXL')
     pmdata.height_cut(maxheight=0.85)  # kpc
     pmdata.to_space_velocties()
     pmdata.UVW_to_galcen()
-    data = pmdata.get_tau_radii_vZg_sigma2Ws_container()
-    hyperparams = HyperParams(data['sigma2Ws'])
+    data = pmdata.get_tau_radii_vZg_sigma2Ws_container(max_uncer_variance=150.)
+    hyperparams = HyperParams(data.sigma2Ws)
     ndim = 3
     nwalkers = 20
     init_guess = (225.0, 0.35, 0.06)  # km/s,beta,kpc**-1 param guesses
