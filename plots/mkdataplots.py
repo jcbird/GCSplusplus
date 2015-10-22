@@ -28,7 +28,8 @@ labels = [r'$\delta_{\mathrm{PMRA}} [mas/yr]$',
           'age [Gyr]', 'W [km/s]']
 
 plotdata = np.column_stack([tridata, pmucac.get_Ws()])
-figure = data_triangle.triangle_plot(plotdata, labels, range=[.99]*6,
+ranges1 = [(0, 5.0), (0, 5.0), 0.99, 0.99, 0.99, 0.99]
+figure = data_triangle.triangle_plot(plotdata, labels, range=ranges1,
                                      quantiles=[.16, .5, .85])
 figname = 'pmerr_r_z_age'
 figure.savefig('{0}.eps'.format(figname), format='eps')

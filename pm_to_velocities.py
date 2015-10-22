@@ -195,12 +195,12 @@ class PMmeasurements(object):  # New style class
 
     def calc_spacevel_uncer_var_tensor(self):
         """
-        Right now assumes ZERO error in RV (km/s) and 5% distance errors
+        Right now assumes ZERO error in RV (km/s) and 2.5% distance errors
         """
-        dist_uncer = 0.05 * self.get_col('RC_DIST')
+        dist_uncer = 0.025 * self.get_col('RC_DIST')
         uncer_tensor = bcoords.cov_dvrpmllbb_to_vxyz(self.get_col('RC_DIST'),
                                dist_uncer,
-                               np.zeros_like(self.get_col('VHELIO_AVG')),
+                               self.get_col('VERR'),
                                self.pmll_pmbb[:, 0], self.pmll_pmbb[:, 1],
                                self.covar_pmllpmbb, self.get_col('GLON'),
                                self.get_col('GLAT'), degree=self.degree)
@@ -273,10 +273,10 @@ bined_mask)
         #return self.get_col('GALVZ') #km/s from Jo
 
     def get_radii(self):
-        return self.get_col('RC_GALR') #km/s from Jo
+        return self.get_col('RC_GALR')  # km/s from Jo
 
     def get_sigma2Ws(self):
-        return self.spacevel_uncer_var_tensor[:,2,2] #(km.s)**2
+        return self.spacevel_uncer_var_tensor[:, 2, 2]  # (km.s)**2
 
     def height_cut(self, maxheight=0.5, heightcol='RC_GALZ'):
         """

@@ -39,7 +39,7 @@ def run_emcee(ndim, nwalkers, p0, lnprob_func, lnprob_args, threads=1):
     if (len(lnprob_args) == 2):
         sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob_func,
                                         args=lnprob_args, threads=threads)
-        sampler.run_mcmc(p0, 15000)
+        sampler.run_mcmc(p0, 20000)
         return sampler
 
 
@@ -74,7 +74,7 @@ def lnlh(data, params, hyperparams):
     variance_W0, beta_W, inv_scalelen_W = params
     variances_W = (variance_W0 * np.power((ages / hyperparams.get_age0()),
                                           2. * beta_W) *
-                   np.exp(-2. * radii * inv_scalelen_W) +
+                   np.exp(-2. * (radii - 8.0) * inv_scalelen_W) +
                    hyperparams.get_sigma2Ws())
     return (-0.5 * np.sum(Ws * Ws / variances_W) -
             0.5 * np.sum(np.log(variances_W)))
@@ -95,7 +95,7 @@ def lnprior(params, hyperparams):
         return -np.Inf
     if inv_scalelen_W < -.1:  # kpc**-1
         return -np.Inf
-    if inv_scalelen_W > .2:  # kpc**-1
+    if inv_scalelen_W > .4:  # kpc**-1
         return -np.Inf
     return 0.
 
@@ -111,21 +111,22 @@ def mk_triangle_plot(sampler, nstart=500):
     samples = sampler.chain[:, nstart:, :].reshape((-1, 3))
     fig = corner.corner(samples, labels=[r"$S_{W_0}$ [km$^2$/s$^2$]",
                                          r"$\beta$",
-                                         r"$R_{W_0}^{-1}$ [kpc]"])
+                                         r"$R_{W_0}^{-1}$ [kpc]"],
+                        quantiles=[.16, .5, .84], show_titles=True)
     fig.savefig("triangle0.png")
 
 
 if __name__ == "__main__":
     pmdata = pm_to_vels.PMmeasurements(RCcatalog=pm_to_vels.catalog,
-                                       pmcatalog='PPMXL')
-    pmdata.height_cut(maxheight=0.85)  # kpc
+                                       pmcatalog='UCAC',
+                                       maxpmuncer=1.5, maxheight=0.7)
     pmdata.to_space_velocties()
     pmdata.UVW_to_galcen()
-    data = pmdata.get_tau_radii_vZg_sigma2Ws_container(max_uncer_variance=150.)
+    data = pmdata.get_tau_radii_vZg_sigma2Ws_container()  # max_uncer_variance=100
     hyperparams = HyperParams(data.sigma2Ws)
     ndim = 3
-    nwalkers = 20
-    init_guess = (225.0, 0.35, 0.06)  # km/s,beta,kpc**-1 param guesses
+    nwalkers = 10
+    init_guess = (200.0, 0.35, 0.1)  # km/s,beta,kpc**-1 param guesses
     p0 = init_emcee(init_guess, nwalkers)
     plot_and_run_emcee(nexec=1, ndim=ndim, nwalkers=nwalkers, p0=p0,
                        lnprob_func=lnprob, lnprob_args=[data, hyperparams])
