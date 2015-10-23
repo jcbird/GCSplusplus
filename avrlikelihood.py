@@ -119,10 +119,11 @@ def mk_triangle_plot(sampler, nstart=500):
 if __name__ == "__main__":
     pmdata = pm_to_vels.PMmeasurements(RCcatalog=pm_to_vels.catalog,
                                        pmcatalog='UCAC',
-                                       maxpmuncer=1.5, maxheight=0.7)
+                                       maxpmuncer=5.5, maxheight=0.7)
     pmdata.to_space_velocties()
     pmdata.UVW_to_galcen()
-    data = pmdata.get_tau_radii_vZg_sigma2Ws_container()  # max_uncer_variance=100
+    data = pmdata.get_tau_radii_vZg_sigma2Ws_container()
+    # max_uncer_variance=100
     hyperparams = HyperParams(data.sigma2Ws)
     ndim = 3
     nwalkers = 10
