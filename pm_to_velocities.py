@@ -96,14 +96,12 @@ class PMmeasurements(object):  # New style class
         """
         matches = (self.catalog['PMMATCH{}'.format(self._pmcolname_mod)] == 1)
         # setting above 0 below makes sure of no -9999 vals
-        goodpmRAerr = np.logical_and(self.catalog[self._pmcolname('PMRA_ERR')] >=
-                                     0.,
-                                     self.catalog[self._pmcolname('PMRA_ERR')] <=
-                                     self.maxpmuncer)  # mas/yr
-        goodpmDECerr = np.logical_and(self.catalog[self._pmcolname('PMDEC_ERR')] >=
-                                      0.,
-                                      self.catalog[self._pmcolname('PMDEC_ERR')] <=
-                                      self.maxpmuncer)  # mas/yr
+        pmra_err = self.catalog[self._pmcolname('PMRA_ERR')]
+        pmdec_err = self.catalog[self._pmcolname('PMDEC_ERR')]
+        goodpmRAerr = np.logical_and(pmra_err >= 0.,
+                                     pmra_err <= self.maxpmuncer)  # mas/yr
+        goodpmDECerr = np.logical_and(pmdec_err >= 0.,
+                                      pmdec_err <= self.maxpmuncer)  # mas/yr
         goodHeight = (np.abs(self.catalog['RC_GALZ']) < self.maxheight)
         if addmask is not None:
             self.mask = np.logical_and.reduce((goodpmRAerr, goodpmDECerr,
@@ -117,9 +115,11 @@ class PMmeasurements(object):  # New style class
         Getter for proper motion corrections (subtracting off mean PM of PPMXL)
         # Inputs
         - source: (string) 'dqsou', 'dgalu', 'ppmxl'
-                  'dqsou' and 'dgalu' refer to interpolated corrections from Bertrand (see HWR email
-                  from 2015-08-04) using either quasars or galaxies as a reference objects.
-                  'ppmxl' uses mean velocity of entire ppmxl catalog as a function of position
+                  'dqsou' and 'dgalu' refer to interpolated corrections from
+                  Bertrand (see HWR email from 2015-08-04) using either
+                  quasars or galaxies as a reference objects. 'ppmxl' uses
+                  mean velocity of entire ppmxl catalog as a function
+                  of position
 
         # Outputs
         - dpmra: (array)  delta offset in RA [mas/yr]
@@ -132,10 +132,12 @@ class PMmeasurements(object):  # New style class
         if self.biascorrect is not 'ppmxl':
             dpmra = self.get_col(self.biascorrect+'RA')
             dpmdec = self.get_col(self.biascorrect+'DEC')
-            dpmra[np.isnan(dpmra)] = 0.0  # mas/yr , if NO correction available, set to 0.0
-            dpmdec[np.isnan(dpmdec)] = 0.0  # mas/yr , if NO correction available, set to 0.0
-            print('Bias-correction for PMs\nSource: {0}'.format(self.biascorrect))
-            return(dpmra,dpmdec)
+            dpmra[np.isnan(dpmra)] = 0.0  # mas/yr ,
+            # if NO correction available, set to 0.0
+            dpmdec[np.isnan(dpmdec)] = 0.0  # mas/yr
+            print('Bias-correction for PMs')
+            print('Source: {0}'.format(self.biascorrect))
+            return(dpmra, dpmdec)
         else:
             print('ppmxl mean PM correction not available yet')
 
@@ -269,8 +271,9 @@ bined_mask)
 
     # THESE Getters should be properties ! TODO
     def get_Ws(self):
-        return self.vRvTvZ_g[2]  #GALVZ equivalent #incorporates bias corrections!1
-        #return self.get_col('GALVZ') #km/s from Jo
+        return self.vRvTvZ_g[2]  # GALVZ equivalent
+        # incorporates bias corrections!1
+        # return self.get_col('GALVZ') #km/s from Jo
 
     def get_radii(self):
         return self.get_col('RC_GALR')  # km/s from Jo
