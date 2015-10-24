@@ -50,7 +50,7 @@ class fidmodel(object):
     sigW:   Uncertainty in W velocity
     """
 
-    def __init__(self, data, ndim=3, nwalkers=20, guess=(200.0, 0.35, 0.1),
+    def __init__(self, ndim=3, nwalkers=20, guess=(200.0, 0.35, 0.1),
                  plotname='triangle0'):
         """
         Initialize fidmodel instance.
@@ -58,9 +58,6 @@ class fidmodel(object):
         Parameters
         ----------------
 
-        data : namedtuple
-            Object containing radii, W vels, ages, and sigma_W^2
-            attrs of object are 'radii','Ws','ages','sigma2Ws', respectively.
         ndim : int
             Number of dimensions (# of parameters)
         nwalkers : int
@@ -72,16 +69,11 @@ class fidmodel(object):
         Notes
         ----------------
 
-        Hyperparams automatically assigned sigma2Ws, this can be made more
-        versitile.
-
         """
-        self.data = data
         self.ndim = ndim
         self.nwalkers = nwalkers
         self.guess = guess
         self.plotname = plotname
-        self.hparams = HyperParams(data.sigma2Ws)
 
     def init_emcee(self):
         """
@@ -94,23 +86,29 @@ class fidmodel(object):
         # Units (km/s,beta,kpc**-1)
         self.p0 = p0
 
-    def lnlh(self, params):
+    @staticmethod
+    def lnlh(data, params, hyperparams):
         """
         # Inputs
-        - params: variance_W0, beta_W, inv_scalelen_W
+        params: variance_W0, beta_W, inv_scalelen_W
                 shape (3)
+        data : namedtuple
+            Object containing radii, W vels, ages, and sigma_W^2
+            attrs of object are 'radii','Ws','ages','sigma2Ws', respectively.
+        hyperparams : HyperParams instance
+
         # Bugs
         - Rewrite to class, this could break!!!
         - This is really brittle, it is only there to serve a single customer
         """
-        ages = self.data.ages
-        radii = self.data.radii
-        Ws = self.data.Ws
+        ages = data.ages
+        radii = data.radii
+        Ws = data.Ws
         variance_W0, beta_W, inv_scalelen_W = params
-        variances_W = (variance_W0 * np.power((ages / self.hparams.get_age0()),
+        variances_W = (variance_W0 * np.power((ages / hyperparams.get_age0()),
                                               2. * beta_W) *
                        np.exp(-2. * (radii - 8.0) * inv_scalelen_W) +
-                       self.hparams.get_sigma2Ws())
+                       hyperparams.get_sigma2Ws())
         return (-0.5 * np.sum(Ws * Ws / variances_W) -
                 0.5 * np.sum(np.log(variances_W)))
 
@@ -143,22 +141,22 @@ class fidmodel(object):
             return -np.inf
         return 0.0
 
-    def lnprob(self, params):
-        lnp = self.lnprior(params)
+    @staticmethod
+    def lnprob(params, data, hyperparams):
+        lnp = fidmodel.lnprior(params)
         if not np.isfinite(lnp):
             return -np.Inf
-        return lnp + self.lnlh(params)
+        return lnp + fidmodel.lnlh(data, params, hyperparams)
 
-    def run_emcee(self, threads=1):
-        lnprob_args = [self.data, self.hparams]
-        lnprob_args = []
-        lnprob_func = self.lnprob
+    def run_emcee(self, data, hyperparams, steps=20000, threads=1):
+        lnprob_args = [data, hyperparams]
+        lnprob_func = fidmodel.lnprob
 
-        if (len(lnprob_args) == 0):
+        if (len(lnprob_args) == 2):
             sampler = emcee.EnsembleSampler(self.nwalkers, self.ndim,
                                             lnprob_func, args=lnprob_args,
                                             threads=threads)
-            sampler.run_mcmc(self.p0, 20000)
+            sampler.run_mcmc(self.p0, steps)
             self.sampler = sampler
 
     def plot_emcee_params(self, nstart=500, **corner_kwargs):
@@ -179,10 +177,12 @@ if __name__ == "__main__":
     pmdata.to_space_velocties()
     pmdata.UVW_to_galcen()
     data = pmdata.get_tau_radii_vZg_sigma2Ws_container()
-    model = fidmodel(data, plotname='current_tri0')
+    hparams = HyperParams(data.sigma2Ws)
+    model = fidmodel(plotname='current_tri0')
     model.init_emcee()
-    model.run_emcee()
+    model.run_emcee(data, hparams)
     model.plot_emcee_params()
+
 
 #    def plot_emcee(self, nexec=1):
 #    """
