@@ -163,7 +163,7 @@ class fidmodel(object):
         samples = self.sampler.chain[:, nstart:, :].reshape((-1, 3))
         fig = corner.corner(samples, labels=[r"$S_{W_0}$ [km$^2$/s$^2$]",
                                              r"$\beta$",
-                                             r"$R_{W_0}^{-1}$ [kpc]"],
+                                             r"$R_{\sigma_W}^{-1}$ [kpc]"],
                             quantiles=[.16, .5, .84], show_titles=True,
                             title_kwargs={'fontsize': 12}, **corner_kwargs)
         fig.savefig(self.plotname+".png", format='png')
