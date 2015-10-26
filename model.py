@@ -173,12 +173,12 @@ class fidmodel(object):
 if __name__ == "__main__":
     pmdata = pm_to_vels.PMmeasurements(RCcatalog=pm_to_vels.catalog,
                                        pmcatalog='UCAC',
-                                       maxpmuncer=2.0, maxheight=0.7)
+                                       maxpmuncer=4.0, maxheight=0.7)
     pmdata.to_space_velocties()
     pmdata.UVW_to_galcen()
     data = pmdata.get_tau_radii_vZg_sigma2Ws_container()
     hparams = HyperParams(data.sigma2Ws)
-    model = fidmodel(plotname='current_tri0')
+    model = fidmodel(plotname='current_tri1')
     model.init_emcee()
     model.run_emcee(data, hparams)
     model.plot_emcee_params()

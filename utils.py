@@ -7,11 +7,13 @@ import os
 import sys
 import numpy.lib.recfunctions as rfn
 import numpy as np
+import astropy.io.fits as pyfits
 
 # Data directories and files
 _homedir = os.path.expanduser('~')
 _apogee_data_dir = os.path.join(_homedir, 'obs_data/apogee')
 _cannon_cat_file = "redclump_sample_A.txt"
+_ucac_apogee_file = "allStar-v603_UCAC4.fits"
 if os.path.exists(_apogee_data_dir):
     pass
 else:  # Some other computer
@@ -21,6 +23,15 @@ else:  # Some other computer
 os.environ['APOGEE_REDUX'] = 'v603'
 os.environ['APOGEE_DATA'] = _apogee_data_dir
 import apogee.tools.read as apread
+
+
+def read_anders():
+    ucac_apogee_file = os.path.join(_apogee_data_dir, _ucac_apogee_file)
+    ucac_fits = pyfits.open(ucac_apogee_file)
+    # change first H header name, it was duplicated
+    ucac_fits[1].columns['H'].name = 'H_APO'
+    ucac_data = ucac_fits[1].data
+    return ucac_data
 
 
 def read_ness_cat():

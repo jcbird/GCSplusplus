@@ -6,4 +6,5 @@ syntax: glob
 *.ipynb
 *~
 .ipynb_checkpoints
+*.stats*
 (^|/)\.

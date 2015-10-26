@@ -8,6 +8,7 @@ catalog = utils.returncat()
 
 dataout = namedtuple('dataout', ['ages', 'radii', 'Ws', 'sigma2Ws'])
 
+
 class PMmeasurements(object):  # New style class
     """
     Class to contain PMs and errors. This will make it each to switch between
@@ -36,18 +37,31 @@ class PMmeasurements(object):  # New style class
     # for column names in RCcatalog
 
     def __init__(self, pmcatalog='UCAC', RCcatalog=catalog, biascorrect=None,
-                 degree=True, maxheight=None, maxpmuncer=None):
+                 degree=True, maxheight=None, maxpmuncer=None,
+                 maxpmfracuncer=None):
         self.pmcatalog = pmcatalog
         self.catalog = catalog    # RC catalog w/ages
         self._pmcolname_mod = PMmeasurements.colmod_lookup.get(pmcatalog, '')
         # default: UCAC
         self.set_maxheight(maxheight)  # [kpc] to cut sample close to the plane
         self.set_maxpmuncer(maxpmuncer)  # [mas/yr] cut sample by PM uncer
+        self.set_maxpmfracuncer(maxpmfracuncer)  # frac uncertainty
         self.degree = degree  # RA,DEC in degrees, set to false otherwise
         self.biascorrect = biascorrect  # ignoring this, not using PPMXL
         self._generatemask()  # create mask over data to be used
 
     # Write now explicity writing getter/setter, should do property!
+    def set_maxpmfracuncer(self, maxpmfracuncer):
+        """
+        Cut the catalog in fractional PM uncertainty. Take everything by
+        default Auto-updates mask.
+        """
+        if maxpmfracuncer is None:
+            maxpmfracuncer = 50.0
+        self.maxpmfracuncer = maxpmfracuncer
+        # if getattr(self, 'maxheight', None) is not None:
+        #     self._generatemask()
+
     def set_maxpmuncer(self, maxpmuncer):
         """
         Cut the catalog in PM uncertainty. Take everything by default
@@ -98,6 +112,12 @@ class PMmeasurements(object):  # New style class
         # setting above 0 below makes sure of no -9999 vals
         pmra_err = self.catalog[self._pmcolname('PMRA_ERR')]
         pmdec_err = self.catalog[self._pmcolname('PMDEC_ERR')]
+        frac_raerr = pmra_err**2 / self.catalog[self._pmcolname('PMRA')]**2
+        frac_decerr = pmdec_err**2 / self.catalog[self._pmcolname('PMDEC')]**2
+        frac_raerr[np.isinf(frac_raerr)] = 0.  # setting inf. low
+        frac_decerr[np.isinf(frac_decerr)] = 0.  # setting inf. low
+        gdfracpmRAerr = frac_raerr < self.maxpmfracuncer
+        gdfracpmDECerr = frac_decerr < self.maxpmfracuncer
         goodpmRAerr = np.logical_and(pmra_err >= 0.,
                                      pmra_err <= self.maxpmuncer)  # mas/yr
         goodpmDECerr = np.logical_and(pmdec_err >= 0.,
@@ -105,9 +125,11 @@ class PMmeasurements(object):  # New style class
         goodHeight = (np.abs(self.catalog['RC_GALZ']) < self.maxheight)
         if addmask is not None:
             self.mask = np.logical_and.reduce((goodpmRAerr, goodpmDECerr,
+                                               gdfracpmRAerr, gdfracpmDECerr,
                                                matches, goodHeight, addmask))
         else:
             self.mask = np.logical_and.reduce((goodpmRAerr, goodpmDECerr,
+                                               gdfracpmRAerr, gdfracpmDECerr,
                                                matches, goodHeight))
 
     def get_pm_corr(self):
@@ -197,12 +219,12 @@ class PMmeasurements(object):  # New style class
 
     def calc_spacevel_uncer_var_tensor(self):
         """
-        Right now assumes ZERO error in RV (km/s) and 2.5% distance errors
+        Using vscatter for error in RV (km/s) and 2.5% distance errors
         """
         dist_uncer = 0.025 * self.get_col('RC_DIST')
         uncer_tensor = bcoords.cov_dvrpmllbb_to_vxyz(self.get_col('RC_DIST'),
                                dist_uncer,
-                               self.get_col('VERR'),
+                               self.get_col('VSCATTER'),
                                self.pmll_pmbb[:, 0], self.pmll_pmbb[:, 1],
                                self.covar_pmllpmbb, self.get_col('GLON'),
                                self.get_col('GLAT'), degree=self.degree)
@@ -296,15 +318,15 @@ bined_mask)
         self.set_maxheight(maxheight)
 
     def get_tau_radii_vZg_sigma2Ws_container(self,
-                                             max_uncer_variance=10000.):
+                                             max_fracW2uncer=10000.):
         """
         WEIRD NAME: reminds me that need to propagate sigma2Ws to sigma2vZg
         Propagates velocity uncertainty cut to data
         returns shape(4,N)
         (ages, radii, Ws, sigma2Ws)
         """
-        self.sigma2W_uncer_cut = max_uncer_variance
-        sigma2Ws_mask = self.get_sigma2Ws() < max_uncer_variance
+        self.sigma2W_fracuncer_cut = max_fracW2uncer
+        sigma2Ws_mask = (self.get_sigma2Ws()/self.get_Ws()**2) < max_fracW2uncer
         age_cut = np.logical_and(self.get_ages() > 0.1, self.get_ages() < 13)
         post_mask = sigma2Ws_mask & age_cut
         self.post_mask = post_mask
